@@ -590,7 +590,8 @@ public class PyFile extends PyObject {
 
         /** For closing directly */
         public void close() {
-            sys.unregisterCloser(this);
+            //Unnecessary - the JVM will close file handlers on exit anyway, and this produces a memory leak
+            //sys.unregisterCloser(this);
             file.close();
             sys = null;
         }

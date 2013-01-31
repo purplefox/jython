@@ -1321,6 +1321,11 @@ public final class Py {
 
     private final static ThreadStateMapping threadStateMapping = new ThreadStateMapping();
 
+    public static void clearThreadLocalState()
+    {
+        threadStateMapping.remove();
+    }
+
     public static final ThreadState getThreadState() {
         return getThreadState(null);
     }

@@ -353,5 +353,6 @@ public class PythonInterpreter {
             // fall through
         }
         sys.cleanup();
+        Py.clearThreadLocalState();
     }
 }

@@ -67,7 +67,8 @@ public class codecs {
         if (!search_function.isCallable()) {
             throw Py.TypeError("argument must be callable");
         }
-        searchPath.append(search_function);
+        //searchPath.append(search_function);
+        System.out.println("*** Adding search_function: " + search_function);
     }
 
     public static PyTuple lookup(String encoding) {

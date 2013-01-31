@@ -23,4 +23,9 @@ class ThreadStateMapping {
         cachedThreadState.set(ts);
         return ts;
     }
+
+  public void remove()
+  {
+    cachedThreadState.remove();
+  }
 }
