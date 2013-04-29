@@ -27,7 +27,7 @@ public class codecs {
     private static char Py_UNICODE_REPLACEMENT_CHARACTER = 0xFFFD;
 
     public static String getDefaultEncoding() {
-        Py.getSystemState().getCodecState().getDefaultEncoding();
+        return Py.getSystemState().getCodecState().getDefaultEncoding();
     }
 
     public static void setDefaultEncoding(String encoding) {
