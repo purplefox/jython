@@ -151,6 +151,8 @@ public class PySystemState extends PyObject implements ClassDictInit {
     public PyObject __dict__;
 
     private int recursionlimit = 1000;
+    
+    private codecs.CodecState codecState;
 
     /** true when a SystemRestart is triggered. */
     public boolean _systemRestart = false;
@@ -320,6 +322,20 @@ public class PySystemState extends PyObject implements ClassDictInit {
         } else {
             shadowing.platform = value;
         }
+    }
+    
+    public synchronized codecs.CodecState getCodecState() {
+        if (codecState == null) {
+            codecState = new codecs.CodecState();
+            try {
+                imp.load("encodings");
+            } catch (PyException exc) {
+                if (exc.type != Py.ImportError) {
+                    throw exc;
+                }
+            }
+        }
+        return codecState;
     }
 
     // xxx fix this accessors

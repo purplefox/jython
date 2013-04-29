@@ -25,97 +25,35 @@ public class codecs {
     public static final String REPLACE = "replace";
     public static final String XMLCHARREFREPLACE = "xmlcharrefreplace";
     private static char Py_UNICODE_REPLACEMENT_CHARACTER = 0xFFFD;
-    private static PyList searchPath;
-    private static PyStringMap searchCache;
-    private static PyStringMap errorHandlers;
-    /** Used to synchronize registry_init. */
-    private static final Object INIT_LOCK = new Object();
-    private static String default_encoding = "ascii";
 
     public static String getDefaultEncoding() {
-        return default_encoding;
+        Py.getSystemState().getCodecState().getDefaultEncoding();
     }
 
     public static void setDefaultEncoding(String encoding) {
-        lookup(encoding);
-        default_encoding = encoding;
+        Py.getSystemState().getCodecState().setDefaultEncoding(encoding);
     }
 
     public static PyObject lookup_error(String handlerName) {
-        registry_init();
-        if (handlerName == null) {
-            handlerName = "strict";
-        }
-        PyObject handler = errorHandlers.__finditem__(handlerName.intern());
-        if (handler == null) {
-            throw new PyException(Py.LookupError,
-                    "unknown error handler name '" + handlerName + "'");
-        }
-        return handler;
+        return Py.getSystemState().getCodecState().lookup_error(handlerName);
     }
 
     public static void register_error(String name, PyObject error) {
-        registry_init();
-        if (!error.isCallable()) {
-            throw Py.TypeError("argument must be callable");
-        }
-        errorHandlers.__setitem__(name.intern(), error);
+        Py.getSystemState().getCodecState().register_error(name, error);
     }
 
     public static void register(PyObject search_function) {
-        registry_init();
-        if (!search_function.isCallable()) {
-            throw Py.TypeError("argument must be callable");
-        }
-        //searchPath.append(search_function);
-        System.out.println("*** Adding search_function: " + search_function);
+        Py.getSystemState().getCodecState().register(search_function);
     }
 
     public static PyTuple lookup(String encoding) {
-        registry_init();
-        PyString v = new PyString(normalizestring(encoding));
-        PyObject cached = searchCache.__finditem__(v);
-        if (cached != null) {
-            return (PyTuple)cached;
-        }
-
-        if (searchPath.__len__() == 0) {
-            throw new PyException(Py.LookupError,
-                "no codec search functions registered: can't find encoding '" + encoding + "'");
-        }
-
-        for (PyObject func : searchPath.asIterable()) {
-            PyObject created = func.__call__(v);
-            if (created == Py.None) {
-                continue;
-            }
-            if (!(created instanceof PyTuple) || created.__len__() != 4) {
-                throw Py.TypeError("codec search functions must return 4-tuples");
-            }
-            searchCache.__setitem__(v, created);
-            return (PyTuple)created;
-        }
-        throw new PyException(Py.LookupError, "unknown encoding '" + encoding + "'");
+        return Py.getSystemState().getCodecState().lookup(encoding);
     }
 
     private static String normalizestring(String string) {
         return string.toLowerCase().replace(' ', '-');
     }
-    private static boolean import_encodings_called;
-
-    private static void import_encodings() {
-        if (!import_encodings_called) {
-            import_encodings_called = true;
-            try {
-                imp.load("encodings");
-            } catch (PyException exc) {
-                if (exc.type != Py.ImportError) {
-                    throw exc;
-                }
-            }
-        }
-    }
-
+    
     public static PyObject decode(PyString v, String encoding, String errors) {
         if (encoding == null) {
             encoding = getDefaultEncoding();
@@ -385,27 +323,6 @@ public class codecs {
         }
     }
 
-    private static void registry_init() {
-        synchronized (INIT_LOCK) {
-            if (searchPath != null) {
-                return;
-            }
-            searchPath = new PyList();
-            searchCache = new PyStringMap();
-            errorHandlers = new PyStringMap();
-            String[] builtinErrorHandlers = new String[]{"strict",
-                IGNORE,
-                REPLACE,
-                XMLCHARREFREPLACE,
-                BACKSLASHREPLACE
-            };
-            for (String builtinErrorHandler : builtinErrorHandlers) {
-                register_error(builtinErrorHandler, Py.newJavaFunc(codecs.class,
-                        builtinErrorHandler + "_errors"));
-            }
-            import_encodings();
-        }
-    }
     /* --- UTF-7 Codec -------------------------------------------------------- */
 
     /* see RFC2152 for details */
@@ -914,6 +831,93 @@ public class codecs {
         }
         return newPosition;
     }
+    
+    public static class CodecState {
+        private PyList searchPath;
+        private PyStringMap searchCache;
+        private PyStringMap errorHandlers;
+        private String default_encoding = "ascii";
+
+        public static final String[] BUILTIN_ERROR_HANDLERS = new String[]{"strict",
+                IGNORE,
+                REPLACE,
+                XMLCHARREFREPLACE,
+                BACKSLASHREPLACE
+        };
+
+        public CodecState() {
+            searchPath = new PyList();
+            searchCache = new PyStringMap();
+            errorHandlers = new PyStringMap();
+
+            for (String builtinErrorHandler : BUILTIN_ERROR_HANDLERS) {
+                register_error(builtinErrorHandler, Py.newJavaFunc(codecs.class,
+                        builtinErrorHandler + "_errors"));
+            }
+        }
+
+        public String getDefaultEncoding() {
+            return default_encoding;
+        }
+
+        public void setDefaultEncoding(String encoding) {
+            lookup(encoding);
+            default_encoding = encoding;
+        }
+
+        public void register_error(String name, PyObject error) {
+            if (!error.isCallable()) {
+                throw Py.TypeError("argument must be callable");
+            }
+            errorHandlers.__setitem__(name.intern(), error);
+        }
+
+        public void register(PyObject search_function) {
+            if (!search_function.isCallable()) {
+                throw Py.TypeError("argument must be callable");
+            }
+            searchPath.append(search_function);
+        }
+
+        public PyTuple lookup(String encoding) {
+            PyString v = new PyString(normalizestring(encoding));
+            PyObject cached = searchCache.__finditem__(v);
+            if (cached != null) {
+                return (PyTuple)cached;
+            }
+
+            if (searchPath.__len__() == 0) {
+                throw new PyException(Py.LookupError,
+                        "no codec search functions registered: can't find encoding '" + encoding + "'");
+            }
+
+            for (PyObject func : searchPath.asIterable()) {
+                PyObject created = func.__call__(v);
+                if (created == Py.None) {
+                    continue;
+                }
+                if (!(created instanceof PyTuple) || created.__len__() != 4) {
+                    throw Py.TypeError("codec search functions must return 4-tuples");
+                }
+                searchCache.__setitem__(v, created);
+                return (PyTuple)created;
+            }
+            throw new PyException(Py.LookupError, "unknown encoding '" + encoding + "'");
+        }
+
+        public PyObject lookup_error(String handlerName) {
+            if (handlerName == null) {
+                handlerName = "strict";
+            }
+            PyObject handler = errorHandlers.__finditem__(handlerName.intern());
+            if (handler == null) {
+                throw new PyException(Py.LookupError,
+                        "unknown error handler name '" + handlerName + "'");
+            }
+            return handler;
+        }
+    }
+
     /* --- RawUnicodeEscape Codec ---------------------------------------- */
     private static char[] hexdigit = "0123456789ABCDEF".toCharArray();
 
