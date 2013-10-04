@@ -585,7 +585,7 @@ public class PyFile extends PyObject {
         public Closer(TextIOBase file, PySystemState sys) {
             this.file = file;
             this.sys = sys;
-            sys.registerCloser(this);
+            //sys.registerCloser(this);
         }
 
         /** For closing directly */
